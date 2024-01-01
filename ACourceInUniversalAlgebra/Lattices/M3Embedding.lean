@@ -1,5 +1,6 @@
-import «ACourceInUniversalAlgebra».Basic
-import «ACourceInUniversalAlgebra».N₅Embedding
+import Paperproof
+
+import «ACourceInUniversalAlgebra».Lattices.N5Embedding
 
 section «Nondistributive modular lattices have M₃»
 

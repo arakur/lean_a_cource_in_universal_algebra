@@ -1,10 +1,12 @@
+import Paperproof
+
+import «ACourceInUniversalAlgebra».Preliminaries.Notation
+
 import Mathlib.Order.Basic
 import Mathlib.Order.Lattice
 import Mathlib.Order.ModularLattice
 import Mathlib.Order.Hom.Basic
 import Mathlib.Order.Hom.Lattice
-
-macro mods:declModifiers "lemma" n:declId sig:declSig val:declVal: command => `($mods:declModifiers theorem $n $sig $val)
 
 section «Lattices»
 
@@ -13,7 +15,7 @@ section «Lattices»
     -- Definition 1.1
     -- Definition 1.2
     -- Definition 1.3
-    -- have been skipped
+    -- skipped
     #check Lattice
 
     -- Examples.

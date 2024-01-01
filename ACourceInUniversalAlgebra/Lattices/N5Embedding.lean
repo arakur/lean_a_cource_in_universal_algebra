@@ -1,4 +1,6 @@
-import «ACourceInUniversalAlgebra».Basic
+import Paperproof
+
+import «ACourceInUniversalAlgebra».Lattices.Basic
 
 section «Nonmodular lattices have N₅»
 
