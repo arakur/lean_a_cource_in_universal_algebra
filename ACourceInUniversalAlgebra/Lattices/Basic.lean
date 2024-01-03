@@ -7,6 +7,7 @@ import Mathlib.Order.Lattice
 import Mathlib.Order.ModularLattice
 import Mathlib.Order.Hom.Basic
 import Mathlib.Order.Hom.Lattice
+import Mathlib.Data.Set.Finite
 
 section «Lattices»
 
@@ -359,8 +360,282 @@ section «Lattices»
 
     #check CompleteLattice
 
+    -- Theorem 4.2
+    -- TODO: prove on precise statement
 
+    lemma sup_complete_iff_inf_complete {α} [PartialOrder α]:
+      (∀ S: Set α, ∃ x: α, IsLUB S x) ↔ (∀ S: Set α, ∃ x: α, IsGLB S x)
+      := by
+        apply Iff.intro ?mp ?mpr
+        case mp =>
+          rintro h: ∀ S, ∃ x, IsLUB S x
+          intro S
+          show ∃ x, IsGLB S x
+          let S' := lowerBounds S
+          have ⟨x, hx⟩: ∃ x, IsLUB S' x := h S'
+          exists x
+          constructor
+          case left =>
+            intro y (hy: y ∈ S)
+            apply hx.right
+            intro z (hz: z ∈ S')
+            exact hz hy
+          case right =>
+            intro y (hy: y ∈ S')
+            exact hx.left hy
+        case mpr =>
+          rintro h: ∀ S, ∃ x, IsGLB S x
+          intro S
+          show ∃ x, IsLUB S x
+          let S' := upperBounds S
+          have ⟨x, hx⟩: ∃ x, IsGLB S' x := h S'
+          exists x
+          constructor
+          case left =>
+            intro y (hy: y ∈ S)
+            apply hx.right
+            intro z (hz: z ∈ S')
+            exact hz hy
+          case right =>
+            intro y (hy: y ∈ S')
+            exact hx.left hy
+
+    -- Examples
+    -- TODO
+
+    -- Definition 4.3
+    -- TODO
 
   end «Complete Lattices, Equivalence Relations, and Algebraic Lattices»
+
+  section «Closure Operators»
+
+    -- Definition 5.1
+
+    structure ClosureOperator (α) where
+      cl: Su α → Su α
+      cl_extensive {S}: S ⊆ cl S
+      cl_idem' {S}: cl (cl S) ⊆ cl S
+      cl_isotone {S T}: S ⊆ T → cl S ⊆ cl T
+
+    instance ClosureOperator.toFun {α}: CoeFun (ClosureOperator α) (λ _ ↦ Su α → Su α) where
+      coe c := c.cl
+
+    def ClosureOperator.IsClosed {α} (C: ClosureOperator α) (S: Su α): Prop :=
+      C S = S
+
+    def ClosureOperator.Closed {α} (C: ClosureOperator α) :=
+      {S // C S = S}
+
+    @[simp]
+    instance ClosureOperator.Closed.instMembership {α} (C: ClosureOperator α):
+      Membership α (ClosureOperator.Closed C) where
+      mem x S := x ∈ S.val
+
+    @[simp]
+    instance ClosureOperator.Closed.instHasSubset {α} (C: ClosureOperator α):
+      HasSubset (ClosureOperator.Closed C) where
+      Subset S T := S.val ⊆ T.val
+
+    @[simp]
+    instance ClosureOperator.Closed.instPartialOrder {α} (C: ClosureOperator α):
+      PartialOrder (ClosureOperator.Closed C) where
+      le S T := S ⊆ T
+      le_refl S := subset_refl S.val
+      le_antisymm S T hST hTS := by
+        cases S; cases T; congr; simp at hST hTS; exact subset_antisymm hST hTS
+      le_trans S T U hST hTU := by
+        show S.val ⊆ U.val; apply subset_trans; exact hST; exact hTU
+
+    lemma ClosureOperator.cl_idem {α} (C: ClosureOperator α) {S: Su α}:
+      C (C S) = C S
+      := by
+        apply subset_antisymm ?le ?ge
+        case le =>
+          exact C.cl_idem'
+        case ge =>
+          apply C.cl_isotone
+          exact C.cl_extensive
+
+    -- Theorem 5.2
+
+    instance ClosureOperator.Closed.instInfSet {α} (C: ClosureOperator α):
+      InfSet (ClosureOperator.Closed C)
+      where
+        sInf Ss := {
+          val := ⋂ S ∈ Ss, S.val
+          property := by
+            apply subset_antisymm ?le ?ge
+            case le =>
+              show C (⋂ S ∈ Ss, S.val) ⊆ ⋂ S ∈ Ss, S.val
+              apply Set.subset_iInter _; simp
+              intro S (hS: S ∈ Ss); show C (⋂ S' ∈ Ss, S'.val) ⊆ S.val
+              have: S.val = C S.val := S.property.symm
+              rw [this]; show C (⋂ S' ∈ Ss, S'.val) ⊆ C S.val
+              apply C.cl_isotone _; show ⋂ S' ∈ Ss, S'.val ⊆ S.val
+              apply Set.iInter_subset_of_subset S _
+              exact Set.iInter_subset_of_subset hS (subset_refl _)
+            case ge => exact C.cl_extensive
+        }
+
+    instance ClosureOperator.Closed.instCompleteLattice {α} (C: ClosureOperator α):
+      CompleteLattice (ClosureOperator.Closed C) := by
+        apply completeLatticeOfInf _
+        intro Ss; show IsGLB Ss (sInf Ss)
+        constructor
+        case left =>
+          intro S hS
+          show sInf Ss ≤ S
+          exact Set.iInter₂_subset_of_subset S hS (subset_refl _)
+        case right =>
+          intro S (hS: ∀ T ∈ Ss, S ≤ T)
+          show S ≤ sInf Ss
+          apply Set.subset_iInter₂ _; intro T (hT: T ∈ Ss)
+          exact hS T hT
+
+    @[simp]
+    def ClosureOperator.Closed.sSup' {α} {C: ClosureOperator α} (Ss: Set C.Closed):
+      C.Closed
+      where
+        val := C (⋃ S ∈ Ss, S.val)
+        property := C.cl_idem
+
+    theorem ClosureOperator.Closed.sSup_eq {α} (C: ClosureOperator α) (Ss: Set C.Closed):
+      sSup Ss = sSup' Ss
+      := by
+        apply le_antisymm ?le ?ge
+        case le =>
+          apply sSup_le _
+          intro S (hS: S ∈ Ss)
+          apply le_trans (b := ⋃ S ∈ Ss, S.val) ?left ?right
+          case left => exact Set.subset_iUnion₂_of_subset S hS (subset_refl _)
+          case right => exact C.cl_extensive
+        case ge =>
+          have: ⋃ S ∈ Ss, S.val ⊆ (sSup Ss).val := by
+            apply Set.iUnion₂_subset
+            intro S (hS: S ∈ Ss); show S ⊆ sSup Ss
+            exact le_sSup hS
+          show (sSup' Ss).val ⊆ (sSup Ss).val
+          calc
+            (sSup' Ss).val
+            _ = C (⋃ S ∈ Ss, S.val) := rfl
+            _ ⊆ C (sSup Ss).val     := C.cl_isotone this
+            _ = (sSup Ss).val       := (sSup Ss).property
+
+    --
+
+    @[simp]
+    def CompleteLattice.SupLower α [CompleteLattice α]: ClosureOperator α where
+      cl S := {x | x ≤ sSup S}
+      cl_extensive := by
+        intro S; show S ⊆ {x | x ≤ sSup S}
+        intro x (hx: x ∈ S); show x ≤ sSup S
+        exact le_sSup _ _ hx
+      cl_idem' := by
+        intro S
+        show {x | x ≤ sSup {y | y ≤ sSup S}} ⊆ {x | x ≤ sSup S}
+        suffices sSup {y | y ≤ sSup S} ≤ sSup S by
+          intro x hx; exact le_trans hx this
+        apply sSup_le _
+        intro y (hy: y ≤ sSup S); exact hy
+      cl_isotone := by
+        intro S T (hST: S ⊆ T)
+        show ∀ x, x ≤ sSup S → x ≤ sSup T
+        suffices sSup S ≤ sSup T by intro x hx; exact le_trans hx this
+        exact sSup_le_sSup hST
+
+    lemma CompleteLattice.SupLower.sup_lower' {α} [CompleteLattice α] (x: α):
+      sSup {z | z ≤ x} = x
+      := by
+        apply le_antisymm ?le ?ge
+        case le =>
+          apply sSup_le _
+          intro z (hz: z ≤ x); exact hz
+        case ge =>
+          apply le_sSup; show x ≤ x; trivial
+
+    def CompleteLattice.SupLower.lower {α} [CompleteLattice α] (x: α):
+      (SupLower α).Closed
+      where
+        val := {y | y ≤ x}
+        property := by
+          show {y | y ≤ sSup {z | z ≤ x}} = {y | y ≤ x}
+          rw [sup_lower']
+
+    def CompleteLattice.SupLower.isom (α) [CompleteLattice α]:
+      α ≃o (SupLower α).Closed
+      where
+        toFun x := lower x
+        invFun S := sSup S.val
+        left_inv x := by
+          show sSup {z | z ≤ x} = x
+          apply le_antisymm ?le ?ge
+          case le =>
+            apply sSup_le _
+            intro z (hz: z ≤ x); exact hz
+          case ge =>
+            apply le_sSup; show x ≤ x; trivial
+        right_inv S := by
+          show lower (sSup S.val) = S
+          apply le_antisymm ?le ?ge
+          case le =>
+            intro x (hx: x ≤ sSup S.val); show x ∈ S.val
+            rw [S.property.symm]; show x ≤ sSup S.val
+            exact hx
+          case ge =>
+            intro x (hx: x ∈ S); show x ≤ sSup S.val
+            exact le_sSup _ _ hx
+        map_rel_iff' := by
+          intro x y
+          show lower x ≤ lower y ↔ x ≤ y
+          apply Iff.intro ?mp ?mpr
+          case mp =>
+            rintro h: lower x ≤ lower y
+            show x ≤ y
+            rw [←sup_lower' x, ←sup_lower' y]
+            show sSup (lower x).val ≤ sSup (lower y).val
+            exact sSup_le_sSup h
+          case mpr =>
+            rintro h: x ≤ y
+            intro z (hz: z ≤ x); show z ≤ y
+            exact le_trans hz h
+
+    -- Theorem 5.3
+
+    theorem CompleteLattice.iso_closed_subsets {α} [CompleteLattice α]:
+      ∃ C: ClosureOperator α, Nonempty (α ≃o C.Closed)
+      := by
+        exists SupLower α; exact ⟨SupLower.isom α⟩
+
+    -- Definition 5.4
+
+    structure AlgebraicClosureOperator (α) [CompleteLattice α] extends ClosureOperator α where
+      algebraic {S}: cl S = ⋃ T ∈ {T | T ≤ S ∧ T.Finite}, cl T
+
+    def AlgebraicClosureOperator.mk' {α} [CompleteLattice α]
+      (cl: Su α → Su α)
+      (cl_extensive: ∀ {S}, S ⊆ cl S)
+      (cl_idem': ∀ {S}, cl (cl S) ⊆ cl S)
+      (algebraic: ∀ {S}, cl S = ⋃ T ∈ {T | T ≤ S ∧ T.Finite}, cl T):
+      AlgebraicClosureOperator α
+      where
+        cl := cl
+        cl_extensive S := cl_extensive S
+        cl_idem' S := cl_idem' S
+        algebraic := algebraic
+        cl_isotone := by
+          intro S T (hST: S ⊆ T)
+          rw [algebraic, algebraic]
+          show ⋃ U ∈ {U | U ≤ S ∧ U.Finite}, cl U ⊆ ⋃ U ∈ {U | U ≤ T ∧ U.Finite}, cl U
+          apply Set.iUnion₂_subset
+          intro U (hU: U ≤ S ∧ U.Finite)
+          show cl U ⊆ ⋃ U ∈ {U | U ≤ T ∧ U.Finite}, cl U
+          apply subset_trans _ (Set.subset_iUnion₂ U _)
+          exact subset_refl _
+          have hSU: U ⊆ T := subset_trans hU.left hST
+          exact ⟨hSU, hU.right⟩
+
+    -- TODO
+  end «Closure Operators»
 
 end «Lattices»
